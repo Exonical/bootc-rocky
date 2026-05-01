@@ -1,0 +1,41 @@
+releasever: 10
+
+repos:
+  - baseos
+  - appstream
+
+variables:
+  distro: "rocky10"
+
+packages:
+  - rocky-repos
+
+postprocess:
+  - |
+    #!/usr/bin/env bash
+
+    set -euo pipefail
+
+    mkdir -p /usr/lib/bootc/install/
+    cat > /usr/lib/bootc/install/20-rocky.toml << EOF
+    [install]
+    root-fs-type = "xfs"
+    EOF
+  - |
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # Remove 'bootc' dracut module from initramfs config
+    # Rocky Linux bootc package does not yet ship the dracut module (requires >= 1.11.0)
+    DRACUT_CONF="/usr/lib/dracut/dracut.conf.d/20-bootc-base.conf"
+    if [ -f "${DRACUT_CONF}" ]; then
+      sed -i 's/ bootc / /' "${DRACUT_CONF}"
+    fi
+  - |
+    #!/usr/bin/env bash
+    set -euo pipefail
+    dnf clean all
+    rm /var/{log,cache,lib}/* -rf
+    systemctl preset-all
+
+include:
+  - standard/manifest.yaml

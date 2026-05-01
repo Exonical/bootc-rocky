@@ -1,0 +1,26 @@
+kind: ZarfPackageConfig
+metadata:
+  name: omni-control-plane
+  version: 1.7.1
+  architecture: amd64
+  description: |
+    Omni control plane container images. Published into the local Zot
+    registry at first boot so the omni.service and dex.service podman
+    quadlets on this host can pull them offline.
+
+    These images are NOT deployed by Zarf -- they are consumed by podman
+    quadlets on the bootc host, not by a Kubernetes cluster. We use Zarf
+    here purely for its supply-chain properties (digest pin + cosign
+    sign + SBOM) via `zarf package mirror-resources`.
+
+    Omni and Dex are intentionally grouped into one package because their
+    versions are coupled (Dex is Omni's OIDC identity provider; bumps are
+    usually coordinated).
+
+components:
+  - name: control-plane-images
+    description: Omni server + Dex OIDC provider for the host quadlet stack.
+    required: true
+    images:
+      - ghcr.io/siderolabs/omni:v1.7.1
+      - ghcr.io/dexidp/dex:v2.45.1

@@ -1,0 +1,31 @@
+kind: ZarfPackageConfig
+metadata:
+  name: cilium
+  version: 1.19.3
+  architecture: amd64
+  description: |
+    Cilium CNI 1.19.3 container images for airgap mirroring. Tag set
+    extracted from upstream values.yaml:
+      https://raw.githubusercontent.com/cilium/cilium/v1.19.3/install/kubernetes/cilium/values.yaml
+
+    Mirrored into Zot at localhost:5000 for downstream Talos workers.
+
+    Talos worker config:
+      machine:
+        registries:
+          mirrors:
+            quay.io: { endpoints: [ "http://<omni-host>:5000" ] }
+
+components:
+  - name: cilium-images
+    description: Cilium agent, operator, Envoy, Hubble, certgen, startup-script.
+    required: true
+    images:
+      - quay.io/cilium/cilium:v1.19.3
+      - quay.io/cilium/operator-generic:v1.19.3
+      - quay.io/cilium/cilium-envoy:v1.36.6-1776000132-2437d2edeaf4d9b56ef279bd0d71127440c067aa
+      - quay.io/cilium/hubble-relay:v1.19.3
+      - quay.io/cilium/hubble-ui:v0.13.3
+      - quay.io/cilium/hubble-ui-backend:v0.13.3
+      - quay.io/cilium/certgen:v0.4.1
+      - quay.io/cilium/startup-script:1763560095-8f36c34

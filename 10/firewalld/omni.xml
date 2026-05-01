@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<service>
+  <short>Omni</short>
+  <description>Sidero Labs Omni stack: HTTPS UI/API (443), Dex OIDC (5556), Talos machine API (8090), Kubernetes proxy (8100), SideroLink WireGuard (50180/udp), and the Zot airgap container registry (5000).</description>
+  <port protocol="tcp" port="443"/>
+  <port protocol="tcp" port="5000"/>
+  <port protocol="tcp" port="5556"/>
+  <port protocol="tcp" port="8090"/>
+  <port protocol="tcp" port="8100"/>
+  <port protocol="udp" port="50180"/>
+</service>

@@ -1,0 +1,15 @@
+[Unit]
+Description=Load pre-baked Zot container image into podman storage (airgap)
+Documentation=file:///usr/share/doc/omni/README.md
+ConditionPathExists=!/var/lib/containers/storage/.airgap-loaded
+After=network.target
+Before=zot.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/libexec/airgap-image-load
+ExecStartPost=/usr/bin/touch /var/lib/containers/storage/.airgap-loaded
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,25 @@
+[Unit]
+Description=Dex OIDC provider for Omni
+Documentation=https://dexidp.io/
+After=network-online.target omni-bootstrap.service zarf-package-publish.service
+Wants=network-online.target
+Requires=omni-bootstrap.service zarf-package-publish.service
+
+[Container]
+Image=localhost:5000/dexidp/dex:v2.45.1
+ContainerName=dex
+PublishPort=5556:5556
+
+# Generated on first boot by omni-bootstrap.service.
+Volume=/etc/dex/dex.yaml:/etc/dex/dex.yaml:ro,Z
+Volume=/etc/dex/tls:/etc/dex/tls:ro,Z
+
+Exec=dex serve /etc/dex/dex.yaml
+
+[Service]
+Restart=on-failure
+RestartSec=10
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target default.target

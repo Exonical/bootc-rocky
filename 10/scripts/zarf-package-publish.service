@@ -1,0 +1,25 @@
+[Unit]
+Description=Verify and mirror Zarf packages into local Zot registry
+Documentation=file:///usr/share/doc/omni/README.md
+Documentation=https://docs.zarf.dev/
+ConditionPathExists=!/var/lib/zarf/.published
+ConditionPathExistsGlob=/usr/share/zarf/packages/zarf-package-*.tar.zst
+# Zot must be serving before we can push packages into it, and Omni/Dex
+# must not start before their images are mirrored.
+After=zot.service
+Requires=zot.service
+Before=omni.service dex.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# Each Zarf package contains many images; mirroring + verifying can take a
+# while on first boot. Generous timeout for the whole publish pass.
+TimeoutStartSec=1800
+# Zarf reads/writes its config dir under $HOME; systemd services have no
+# HOME by default. Point it at /var/lib/zarf (created by tmpfiles.d).
+Environment=HOME=/var/lib/zarf
+ExecStart=/usr/libexec/zarf-package-publish
+
+[Install]
+WantedBy=multi-user.target

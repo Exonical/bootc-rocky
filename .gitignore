@@ -1,0 +1,17 @@
+# Build outputs
+/output/
+
+# Cosign signing private key for Zarf packages -- MUST NOT be committed.
+# (10/zarf/cosign.pub IS committed; only the .key is secret.)
+10/zarf/cosign.key
+**/cosign.key
+**/cosign.password
+
+# Per-deployment artifacts pulled back from a running VM during local
+# testing (e.g. the Root CA generated on first boot by omni-bootstrap).
+# Each deployment generates its own; pinning one in the repo would be
+# misleading.
+/omni-lab-ca.crt
+*.crt
+*.pem
+!10/firewalld/*.xml

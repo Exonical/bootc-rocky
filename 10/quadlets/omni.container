@@ -1,0 +1,47 @@
+[Unit]
+Description=Sidero Labs Omni v1.7.1 (self-hosted, YAML config)
+Documentation=https://docs.siderolabs.com/omni/reference/omni-configuration
+Documentation=https://docs.siderolabs.com/omni/self-hosted/run-omni-on-prem
+After=network-online.target omni-bootstrap.service zarf-package-publish.service dex.service
+Wants=network-online.target
+Requires=omni-bootstrap.service zarf-package-publish.service dex.service
+
+[Container]
+Image=localhost:5000/siderolabs/omni:v1.7.1
+ContainerName=omni
+Network=host
+AddCapability=NET_ADMIN
+AddDevice=/dev/net/tun
+
+# Omni embeds wireguard-go (creates a userspace-API unix socket under
+# /var/run/wireguard/) and needs /dev/net/tun + NET_ADMIN. Run the container
+# as type spc_t ("super-privileged container") which is defined in the
+# container-selinux policy for exactly this use case: SELinux stays
+# enforcing, labels are applied, but the container is granted the broad
+# kernel-facing permissions this workload needs.
+SecurityLabelType=spc_t
+
+# Configuration, secrets, and TLS material -- generated on first boot by
+# omni-bootstrap.service (or operator-supplied).
+Volume=/etc/omni/config.yaml:/etc/omni/config.yaml:ro,Z
+Volume=/etc/omni/omni.asc:/omni.asc:ro,Z
+Volume=/etc/omni/tls:/etc/omni/tls:ro,Z
+
+# Make Omni's OIDC client trust certificates issued by our local Root CA.
+# Go's crypto/x509 reads SSL_CERT_FILE before the platform default locations.
+Environment=SSL_CERT_FILE=/etc/omni/tls/ca-bundle.crt
+
+# Persistent state (embedded etcd + SQLite).
+Volume=/var/lib/omni:/var/lib/omni:rw,Z
+
+# Image entrypoint is /omni; the only flag we pass is --config-path.
+Exec=--config-path=/etc/omni/config.yaml
+
+[Service]
+Restart=on-failure
+RestartSec=10
+TimeoutStartSec=900
+ExecStartPre=/usr/bin/mkdir -p /var/lib/omni/etcd
+
+[Install]
+WantedBy=multi-user.target default.target

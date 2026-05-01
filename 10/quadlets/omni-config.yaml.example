@@ -1,0 +1,69 @@
+# Omni v1.7+ configuration file
+# Reference: https://docs.siderolabs.com/omni/reference/omni-configuration
+# Copy to /etc/omni/config.yaml on the running host and edit before starting omni.service.
+
+# Account identification.
+# Generate ONCE with `uuidgen` and NEVER change it after initial setup.
+account:
+  id: REPLACE-WITH-uuidgen-OUTPUT
+
+# Authentication. This example uses OIDC against the bundled Dex provider
+# (see /usr/share/containers/systemd/dex.container).
+auth:
+  initialUsers:
+    - admin@example.com
+  auth0:
+    enabled: false
+  oidc:
+    enabled: true
+    providerURL: https://auth.example.com:5556
+    clientID: omni
+    clientSecret: omni-dex-secret
+    scopes:
+      - openid
+      - profile
+      - email
+
+# Service endpoints and TLS material.
+# certFile/keyFile paths must exist inside the container; we bind-mount
+# /etc/omni/tls into the container at the same path.
+services:
+  api:
+    endpoint: 0.0.0.0:443
+    advertisedURL: https://omni.example.com
+    certFile: /etc/omni/tls/tls.crt
+    keyFile:  /etc/omni/tls/tls.key
+  kubernetesProxy:
+    endpoint: 0.0.0.0:8100
+    advertisedURL: https://omni.example.com:8100
+    certFile: /etc/omni/tls/tls.crt
+    keyFile:  /etc/omni/tls/tls.key
+  machineAPI:
+    advertisedURL: grpc://omni.example.com:8090
+  siderolink:
+    joinTokensMode: strict
+    wireGuard:
+      advertisedEndpoint: 203.0.113.10:50180
+  # Optional: wildcard *.proxy.omni.example.com required for workloadProxy.
+  # workloadProxy:
+  #   enabled: true
+  #   subdomain: proxy
+  #   useOmniSubdomain: true
+
+# Storage backends.
+storage:
+  default:
+    kind: etcd
+    etcd:
+      embedded: true
+      embeddedDBPath: /var/lib/omni/etcd/
+      # The quadlet mounts /etc/omni/omni.asc -> /omni.asc inside the container.
+      privateKeySource: "file:///omni.asc"
+  sqlite:
+    path: /var/lib/omni/sqlite.db
+
+# Optional: enable S3-backed etcd snapshots.
+# Configure S3 credentials via environment variables in a drop-in file:
+# /etc/systemd/system/omni.service.d/s3.conf
+# etcdBackup:
+#   s3Enabled: true

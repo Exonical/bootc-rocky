@@ -1,0 +1,16 @@
+[Unit]
+Description=Bootstrap PKI, etcd key, and default configs for Omni and Dex
+Documentation=file:///usr/share/doc/omni/README.md
+ConditionPathExists=!/var/lib/omni/.bootstrap-done
+After=network-online.target
+Wants=network-online.target
+Before=dex.service omni.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/libexec/omni-bootstrap
+ExecStartPost=/usr/bin/touch /var/lib/omni/.bootstrap-done
+
+[Install]
+WantedBy=multi-user.target
