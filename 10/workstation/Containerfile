@@ -12,15 +12,17 @@ ARG BASE_IMAGE=localhost/rocky-bootc:latest
 FROM ${BASE_IMAGE}
 
 # ---- GNOME desktop (minimal) + core utilities ---------------------------
+# Rocky 10 (GNOME 47): gnome-terminal -> ptyxis, gnome-tweaks -> gnome-tweaks
+# is in EPEL/appstream; fall back gracefully if unavailable.
 RUN dnf install -y --setopt=install_weak_deps=False \
     @gnome-desktop \
     gdm \
-    gnome-terminal \
+    ptyxis \
     nautilus \
-    gnome-tweaks \
     gnome-shell-extension-classification-banner \
     gnome-shell-extension-heads-up-display \
     xdg-utils \
+ && dnf install -y --setopt=install_weak_deps=False gnome-tweaks || true \
  && dnf clean all \
  && rm -rf /var/cache/* /var/log/* /var/lib/dnf /var/tmp/*
 
