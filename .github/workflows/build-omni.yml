@@ -16,6 +16,11 @@ on:
 env:
   IMAGE_NAME: rocky-bootc
   OMNI_IMAGE_NAME: rocky-bootc-omni
+  REGISTRY: ghcr.io
+
+permissions:
+  contents: read
+  packages: write
 
 jobs:
   build:
@@ -78,3 +83,19 @@ jobs:
         run: |
           sudo podman inspect ${{ env.OMNI_IMAGE_NAME }}:latest \
             --format '{{.Id}} {{.Size}}'
+
+      - name: Login to GHCR
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | \
+            sudo podman login ${{ env.REGISTRY }} \
+              -u ${{ github.actor }} --password-stdin
+
+      - name: Push to GHCR
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          FULL_IMAGE=${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.OMNI_IMAGE_NAME }}
+          sudo podman tag \
+            ${{ env.OMNI_IMAGE_NAME }}:latest \
+            ${FULL_IMAGE}:latest
+          sudo podman push ${FULL_IMAGE}:latest

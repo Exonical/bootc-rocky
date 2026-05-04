@@ -23,6 +23,11 @@ on:
 env:
   IMAGE_NAME: rocky-bootc
   WORKSTATION_IMAGE_NAME: rocky-bootc-workstation
+  REGISTRY: ghcr.io
+
+permissions:
+  contents: read
+  packages: write
 
 jobs:
   build:
@@ -72,3 +77,19 @@ jobs:
         run: |
           sudo podman inspect ${{ env.WORKSTATION_IMAGE_NAME }}:${{ matrix.rocky_version }} \
             --format '{{.Id}} {{.Size}}'
+
+      - name: Login to GHCR
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | \
+            sudo podman login ${{ env.REGISTRY }} \
+              -u ${{ github.actor }} --password-stdin
+
+      - name: Push to GHCR
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          FULL_IMAGE=${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.WORKSTATION_IMAGE_NAME }}
+          sudo podman tag \
+            ${{ env.WORKSTATION_IMAGE_NAME }}:${{ matrix.rocky_version }} \
+            ${FULL_IMAGE}:${{ matrix.rocky_version }}
+          sudo podman push ${FULL_IMAGE}:${{ matrix.rocky_version }}
