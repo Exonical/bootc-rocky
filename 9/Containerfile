@@ -16,6 +16,7 @@ RUN chmod +x /usr/libexec/bootc-base-imagectl
 RUN rm -rf /etc/yum.repos.d/*
 
 COPY --from=repos /etc/yum.repos.d/*.repo /etc/yum.repos.d/
+COPY --from=repos /etc/dnf/vars/ /etc/dnf/vars/
 
 COPY --from=repos /etc/pki/rpm-gpg/RPM-GPG-KEY-Rocky-9 /etc/pki/rpm-gpg
 
