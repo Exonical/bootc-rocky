@@ -40,20 +40,30 @@ jobs:
             -f 10/Containerfile \
             .
 
+      - name: Install Zarf and Cosign
+        env:
+          ZARF_VERSION: v0.59.0
+        run: |
+          # Install Zarf
+          curl -fsSL -o /usr/local/bin/zarf \
+            "https://github.com/zarf-dev/zarf/releases/download/${ZARF_VERSION}/zarf_${ZARF_VERSION}_Linux_amd64"
+          chmod +x /usr/local/bin/zarf
+          zarf version
+          # Install Cosign
+          if ! command -v cosign &>/dev/null; then
+            COSIGN_VERSION=v2.4.1
+            curl -fsSL -o /usr/local/bin/cosign \
+              "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-amd64"
+            chmod +x /usr/local/bin/cosign
+          fi
+
       - name: Generate temporary cosign keypair
         run: |
-          sudo apt-get install -y -qq golang-go 2>/dev/null || true
-          if ! command -v cosign &>/dev/null; then
-            go install github.com/sigstore/cosign/v2/cmd/cosign@latest
-            export PATH="$HOME/go/bin:$PATH"
-          fi
-          mkdir -p 10/omni/zarf
           cd 10/omni/zarf
           COSIGN_PASSWORD="" cosign generate-key-pair
 
       - name: Build Zarf packages
         run: |
-          export PATH="$HOME/go/bin:$PATH"
           ./scripts/zarf-build-packages.sh
 
       - name: Build Omni image
