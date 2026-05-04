@@ -1,0 +1,80 @@
+name: Build Omni Image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '10/omni/**'
+      - '.github/workflows/build-omni.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - '10/omni/**'
+      - '.github/workflows/build-omni.yml'
+  workflow_dispatch:
+
+env:
+  IMAGE_NAME: rocky-bootc
+  OMNI_IMAGE_NAME: rocky-bootc-omni
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install podman and dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq podman fuse-overlayfs skopeo
+
+      - name: Build base image (Rocky 10)
+        run: |
+          sudo podman build \
+            --platform=linux/amd64 \
+            --security-opt=label=disable \
+            --cap-add=all \
+            --device /dev/fuse \
+            -t ${{ env.IMAGE_NAME }}:latest \
+            -f 10/Containerfile \
+            .
+
+      - name: Install Zarf and Cosign
+        env:
+          ZARF_VERSION: v0.59.0
+        run: |
+          # Install Zarf
+          curl -fsSL -o /usr/local/bin/zarf \
+            "https://github.com/zarf-dev/zarf/releases/download/${ZARF_VERSION}/zarf_${ZARF_VERSION}_Linux_amd64"
+          chmod +x /usr/local/bin/zarf
+          zarf version
+          # Install Cosign
+          if ! command -v cosign &>/dev/null; then
+            COSIGN_VERSION=v2.4.1
+            curl -fsSL -o /usr/local/bin/cosign \
+              "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-amd64"
+            chmod +x /usr/local/bin/cosign
+          fi
+
+      - name: Generate temporary cosign keypair
+        run: |
+          cd 10/omni/zarf
+          COSIGN_PASSWORD="" cosign generate-key-pair
+
+      - name: Build Zarf packages
+        run: |
+          ./scripts/zarf-build-packages.sh
+
+      - name: Build Omni image
+        run: |
+          sudo podman build \
+            --build-arg BASE_IMAGE=localhost/${{ env.IMAGE_NAME }}:latest \
+            -t ${{ env.OMNI_IMAGE_NAME }}:latest \
+            -f 10/omni/Containerfile \
+            .
+
+      - name: Verify image
+        run: |
+          sudo podman inspect ${{ env.OMNI_IMAGE_NAME }}:latest \
+            --format '{{.Id}} {{.Size}}'

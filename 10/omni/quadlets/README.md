@@ -7,8 +7,7 @@ the CA into the host's trust store, and writes sensible default configuration
 so the stack comes up unattended.
 
 > For the full project reference (architecture, build, deploy, PKI design,
-> SELinux, day-2 operations, troubleshooting) see
-> `@/home/banglin/Documents/rl-bootc/docs/omni-bootc.md`.
+> SELinux, day-2 operations, troubleshooting) see `docs/omni-bootc.md`.
 
 ## Components
 

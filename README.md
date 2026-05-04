@@ -1,87 +1,119 @@
-# AlmaLinux Bootable Container Base Images (bootc)
+# Rocky Linux Bootable Container Images (bootc)
 
-**<ins>Caution</ins>: AlmaLinux bootc images are currently *experimental*. Please use with care and report any issues.**
+This project builds bootable container images for **Rocky Linux 9** and
+**Rocky Linux 10** using [bootc](https://containers.github.io/bootc/).
 
-> **Omni variant**: this fork layers [Sidero Labs Omni](https://docs.siderolabs.com/omni/)
-> v1.7.1 + Dex OIDC on top of the Rocky Linux 10 base via `@10/Containerfile.vm`,
-> with a first-boot bootstrap (`@10/scripts/omni-bootstrap.sh`) that provisions
-> a local PKI, TLS leaf certs, and default configs. See
-> `@docs/omni-bootc.md` for the full build/deploy/operate reference and
-> `@10/quadlets/README.md` for the short operator quickstart.
+Three image variants are provided:
 
-## Available Pre-built Images
+| Variant | Description | Containerfile |
+|---|---|---|
+| **base** | Minimal bootc OS (Rocky 9 or 10) | `9/Containerfile`, `10/Containerfile` |
+| **omni** | Base + [Sidero Labs Omni](https://docs.siderolabs.com/omni/) v1.7.1, Dex OIDC, Zot registry (Rocky 10) | `10/omni/Containerfile` |
+| **workstation** | Base + GNOME desktop, Firefox, VS Code, Python 3.12 | `9/workstation/Containerfile`, `10/workstation/Containerfile` |
 
-Official pre-built experimental images are available on Quay.io:
+## Repository layout
 
-* **[quay.io/almalinuxorg/almalinux-bootc](https://quay.io/repository/almalinuxorg/almalinux-bootc?tab=tags)**
+```
+├── 9/
+│   ├── Containerfile             # Rocky Linux 9 base bootc image
+│   ├── rockylinux-9.yaml         # bootc-base-imagectl manifest
+│   └── workstation/
+│       └── Containerfile         # GNOME workstation on Rocky 9
+├── 10/
+│   ├── Containerfile             # Rocky Linux 10 base bootc image
+│   ├── rockylinux-10.yaml        # bootc-base-imagectl manifest
+│   ├── omni/                     # Omni stack (Rocky 10 only)
+│   │   ├── Containerfile
+│   │   ├── quadlets/             # Systemd Quadlet units (omni, dex, zot)
+│   │   ├── scripts/              # Bootstrap + airgap + zarf-publish
+│   │   ├── firewalld/            # Omni firewalld service definition
+│   │   ├── zot/                  # Zot registry configuration
+│   │   ├── zarf/                 # Zarf package definitions + cosign pubkey
+│   │   └── containers/           # Podman registries.conf.d
+│   └── workstation/
+│       └── Containerfile         # GNOME workstation on Rocky 10
+├── scripts/
+│   ├── zarf-build-packages.sh    # Build Zarf packages from definitions
+│   └── make-seed.sh              # Generate cloud-init seed ISO
+├── docs/
+│   └── omni-bootc.md             # Full Omni build/deploy/operate reference
+└── Makefile
+```
 
-This project provides tooling to build experimental AlmaLinux bootable container images. These images leverage the [bootc project](https://containers.github.io/bootc/), which enables the creation of bootable OS images from container images.
-
-Our images are based on the work done for [CentOS Bootc Base Images](https://gitlab.com/redhat/centos-stream/containers/bootc/-/tree/c10s?ref_type=heads) and utilize [bootc-base-imagectl](https://gitlab.com/fedora/bootc/base-images/-/blob/main/bootc-base-imagectl.md?ref_type=heads) for their construction.
-
-## Project Status & News
-
-* **[2024-09-02]** AlmaLinux announces experimental bootc support and HeliumOS: [Read the blog post](https://almalinux.org/blog/2024-09-02-bootc-almalinux-heliumos/)
-* For the latest general information about AlmaLinux, visit [almalinux.org](https://almalinux.org/get-almalinux/).
-
-
-
-## Building Images (Advanced)
-
-This repository uses `make` to build the images locally.
-
-### Prerequisites
+## Prerequisites
 
 * `make`
-* A container runtime like `podman` or `docker` (ensure it's running and you have appropriate permissions).
-* Sufficient disk space and internet connectivity.
+* `podman` (rootful, or `docker`)
+* Sufficient disk space and internet connectivity
 
-### Build Instructions
+## Quick start
 
-The following examples demonstrate how to build specific variants:
-
-### Example: AlmaLinux OS Kitten 10
+### Base images
 
 ```bash
-make \
-  PLATFORM=linux/amd64 \
-  IMAGE_NAME=almalinux-bootc \
-  VERSION_MAJOR=10-kitten
+# Rocky Linux 10 base
+make base ROCKY_VERSION=10
+
+# Rocky Linux 9 base
+make base ROCKY_VERSION=9
 ```
 
-### Example: AlmaLinux OS 10 (x86_64-v2)
+### Omni variant (Sidero Labs Omni + Dex + Zot — Rocky 10 only)
 
 ```bash
-make \
-  PLATFORM=linux/amd64/v2 \
-  IMAGE_NAME=almalinux-bootc \
-  VERSION_MAJOR=10-kitten
+# 1. Build the Rocky 10 base image
+make base ROCKY_VERSION=10
+
+# 2. Build Zarf packages (requires cosign keypair; see 10/omni/zarf/README.md)
+make zarf-keygen          # one-time
+make zarf-packages
+
+# 3. Build the Omni layered image
+make omni
+
+# 4. (Optional) Build qcow2 and deploy to libvirt
+make qcow2
+make seed HOSTNAME=lab1 DOMAIN=example.com
+make deploy HOSTNAME=lab1
 ```
 
-  
-### Example: AlmaLinux 9 (x86_64)
+See `docs/omni-bootc.md` and `10/omni/quadlets/README.md` for the full
+operator reference.
 
-```  
-make \  
-  PLATFORM=linux/amd64 \  
-  IMAGE_NAME=almalinux-bootc \  
-  VERSION_MAJOR=9  
+### Workstation variant (GNOME desktop)
+
+```bash
+# Rocky 10 workstation
+make base ROCKY_VERSION=10
+make workstation ROCKY_VERSION=10
+
+# Rocky 9 workstation
+make base ROCKY_VERSION=9
+make workstation ROCKY_VERSION=9
+
+# (Optional) Build qcow2
+make workstation-qcow2
 ```
 
-**Explanation of Build Variables:**
+The workstation image includes:
+- GNOME desktop (minimal) with terminal, file manager (Nautilus), tweaks
+- GNOME Shell extensions: classification-banner, heads-up-display
+- Firefox
+- Visual Studio Code
+- Python 3.12
 
-* `PLATFORM`: Specifies the target architecture and variant (e.g., linux/amd64, linux/amd64/v2, linux/arm64).  
-* `IMAGE_NAME`: The base name for the output container image. (e.g. almalinux-bootc) 
-* `VERSION_MAJOR`: The AlmaLinux major version (e.g., 9, 10, 10-kitten).
+## Build variables
 
-## Contributing and Community
+| Variable | Default | Description |
+|---|---|---|
+| `ROCKY_VERSION` | `10` | Rocky Linux major version (`9` or `10`) |
+| `PLATFORM` | `linux/amd64` | Target architecture |
+| `IMAGE_NAME` | `rocky-bootc` | Base image name |
+| `OMNI_IMAGE_NAME` | `rocky-bootc-omni` | Omni variant image name |
+| `WORKSTATION_IMAGE_NAME` | `rocky-bootc-workstation` | Workstation variant image name |
 
-We welcome contributions and feedback!  
-Join the discussion and get involved with the relevant AlmaLinux Special Interest Groups (SIGs):
+Run `make help` for a full list of targets and variables.
 
-* **Atomic SIG:** Focused on atomic updates and related tooling (like bootc).  
-  * [Wiki](https://wiki.almalinux.org/sigs/Atomic.html)  
-  * Chat: [Mattermost](https://chat.almalinux.org/almalinux/channels/sigatomic) | [Matrix](https://matrix.to/#/#sig-atomic:almalinux.im)  
-* **Cloud SIG:** Focused on cloud images and deployments.  
-  * [Wiki](https://wiki.almalinux.org/sigs/Cloud.html)  
-  * Chat: [Mattermost](https://chat.almalinux.org/almalinux/channels/sigcloud) | [Matrix](https://matrix.to/#/#sig-cloud:almalinux.im)
+## Contributing
+
+We welcome contributions and feedback!

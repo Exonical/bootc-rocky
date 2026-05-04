@@ -5,10 +5,10 @@ repos:
   - appstream
 
 variables:
-  distro: "almalinux9"
+  distro: "rocky9"
 
 packages:
-  - almalinux-repos
+  - rocky-repos
 
 postprocess:
   - |
@@ -17,7 +17,7 @@ postprocess:
     set -euo pipefail
 
     mkdir -p /usr/lib/bootc/install/
-    cat > /usr/lib/bootc/install/20-rhel.toml << EOF
+    cat > /usr/lib/bootc/install/20-rocky.toml << EOF
     [install]
     root-fs-type = "xfs"
     EOF
@@ -25,7 +25,7 @@ postprocess:
     #!/usr/bin/env bash
     set -euo pipefail
     # Remove 'bootc' dracut module from initramfs config
-    # AlmaLinux bootc package does not yet ship the dracut module (requires >= 1.11.0)
+    # Rocky Linux bootc package does not yet ship the dracut module (requires >= 1.11.0)
     DRACUT_CONF="/usr/lib/dracut/dracut.conf.d/20-bootc-base.conf"
     if [ -f "${DRACUT_CONF}" ]; then
       sed -i 's/ bootc / /' "${DRACUT_CONF}"

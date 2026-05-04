@@ -1,27 +1,32 @@
 PODMAN = sudo podman
 
-IMAGE_NAME = rocky-bootc
-VERSION_MAJOR = 10
-PLATFORM = linux/amd64
-LABELS ?=
+IMAGE_NAME      = rocky-bootc
+ROCKY_VERSION   ?= 10
+PLATFORM        = linux/amd64
+LABELS          ?=
 
 .ONESHELL:
-.PHONY: all
-all: rechunk
 
-.PHONY: image
-image:
+# =========================================================================
+#  Base image
+# =========================================================================
+.PHONY: base
+base:
 	$(PODMAN) build \
 		--platform=$(PLATFORM) \
 		--security-opt=label=disable \
 		--cap-add=all \
 		--device /dev/fuse \
-		--iidfile /tmp/image-id \
 		$(LABELS) \
 		-t $(IMAGE_NAME) \
-		-f $(VERSION_MAJOR)/Containerfile \
+		-f $(ROCKY_VERSION)/Containerfile \
 		.
 
+# Legacy alias
+.PHONY: image
+image: base
+
+.PHONY: rechunk
 rechunk:
 	$(PODMAN) run \
 		--rm --privileged \
@@ -33,16 +38,17 @@ rechunk:
 	$(PODMAN) tag localhost/rechunked-$(IMAGE_NAME):latest localhost/$(IMAGE_NAME):latest && \
 	$(PODMAN) rmi localhost/rechunked-$(IMAGE_NAME):latest
 
-# -------------------------------------------------------------------------
-# Omni stack: layered VM image, qcow2, cloud-init seed, virt-install deploy.
-# Override on the command line, e.g.:
-#   make qcow2
-#   make seed HOSTNAME=lab1 DOMAIN=example.com
-#   make seed HOSTNAME=lab2 IP=192.168.122.50/24 GATEWAY=192.168.122.1
-#   make deploy HOSTNAME=lab1
-# -------------------------------------------------------------------------
+# =========================================================================
+#  Omni variant (Sidero Labs Omni + Dex + Zot)
+# =========================================================================
 
-VM_IMAGE_NAME ?= $(IMAGE_NAME)-vm
+OMNI_IMAGE_NAME ?= $(IMAGE_NAME)-omni
+
+# Override on the command line, e.g.:
+#   make omni ROCKY_VERSION=10
+#   make qcow2 ROCKY_VERSION=10
+#   make seed HOSTNAME=lab1 DOMAIN=example.com
+#   make deploy HOSTNAME=lab1
 HOSTNAME      ?= omni-lab
 DOMAIN        ?= local
 SSH_KEY       ?= $(HOME)/.ssh/id_ed25519.pub
@@ -52,21 +58,15 @@ OUTPUT_DIR    ?= output
 MEMORY        ?= 4096
 VCPUS         ?= 2
 DISK_SIZE     ?= 40G
-OS_VARIANT    ?= rocky10
+OS_VARIANT    ?= rocky$(ROCKY_VERSION)
 NETWORK       ?= default
-# Optional static network:
 IP            ?=
 GATEWAY       ?=
 DNS           ?= 1.1.1.1
 
-# ---- Zarf packages (everything except the Zot bootstrap) ---------------
-# Omni, Dex, and every image consumed by downstream Talos clusters Omni
-# provisions are delivered as cosign-signed Zarf packages. Only Zot
-# itself is loaded via the Containerfile ARG (see below).
-# See 10/zarf/README.md for the full rationale.
-
+# ---- Zarf packages -------------------------------------------------------
 ZARF                ?= zarf
-ZARF_DIR            = $(VERSION_MAJOR)/zarf
+ZARF_DIR            = 10/omni/zarf
 ZARF_OUTPUT_DIR     = output/zarf
 COSIGN_KEY          ?= $(ZARF_DIR)/cosign.key
 COSIGN_PUB          ?= $(ZARF_DIR)/cosign.pub
@@ -92,19 +92,14 @@ zarf-packages:
 zarf-clean:
 	rm -rf $(ZARF_OUTPUT_DIR)
 
-# ---- Zot registry bootstrap (the one image we can't Zarf) --------------
-# Zot itself is loaded by digest into podman containers-storage at first
-# boot so zot.service can start offline. The digest lives in
-# 10/Containerfile.vm as ARG ZOT_DIGEST; `make zot-refresh` prints the
-# current upstream digest so you can update the ARG in a reviewable diff.
-
+# ---- Zot registry bootstrap -----------------------------------------------
 ZOT_IMAGE ?= ghcr.io/project-zot/zot-minimal-linux-amd64:v2.1.16
 
 .PHONY: zot-refresh
 zot-refresh:
 	@command -v skopeo >/dev/null || { echo "install skopeo"; exit 2; }
 	@command -v sha256sum >/dev/null || { echo "install coreutils"; exit 2; }
-	@current=$$(awk '/^ARG ZOT_DIGEST=/{sub(/^ARG ZOT_DIGEST=/,""); print}' $(VERSION_MAJOR)/Containerfile.vm); \
+	@current=$$(awk '/^ARG ZOT_DIGEST=/{sub(/^ARG ZOT_DIGEST=/,""); print}' 10/omni/Containerfile); \
 	 upstream="sha256:$$(skopeo inspect --raw docker://$(ZOT_IMAGE) | sha256sum | awk '{print $$1}')"; \
 	 echo "image:    $(ZOT_IMAGE)"; \
 	 echo "current:  $$current"; \
@@ -113,13 +108,11 @@ zot-refresh:
 	   echo "up to date"; \
 	 else \
 	   echo; \
-	   echo "to update, edit 10/Containerfile.vm:"; \
+	   echo "to update, edit 10/omni/Containerfile:"; \
 	   echo "  ARG ZOT_DIGEST=$$upstream"; \
 	 fi
 
 .PHONY: zarf-packages-check
-# Cheap gate: confirm at least one Zarf package artifact is present and
-# that the cosign public key has been committed (build needs it baked in).
 zarf-packages-check:
 	@test -f $(COSIGN_PUB) || { \
 	  echo "missing $(COSIGN_PUB); run 'make zarf-keygen' once and commit the public key"; \
@@ -131,21 +124,26 @@ zarf-packages-check:
 	 fi
 	@echo "[zarf-packages-check] OK ($$(ls -1 $(ZARF_OUTPUT_DIR)/zarf-package-*.tar.zst | wc -l) packages)"
 
-.PHONY: image-vm
-image-vm: zarf-packages-check
+.PHONY: omni
+omni: zarf-packages-check
 	$(PODMAN) build \
-		-f $(VERSION_MAJOR)/Containerfile.vm \
-		-t $(VM_IMAGE_NAME) .
+		--build-arg BASE_IMAGE=localhost/$(IMAGE_NAME):latest \
+		-f 10/omni/Containerfile \
+		-t $(OMNI_IMAGE_NAME) .
+
+# Legacy alias
+.PHONY: image-vm
+image-vm: omni
 
 .PHONY: qcow2
-qcow2: image-vm
+qcow2: omni
 	sudo rm -rf $(OUTPUT_DIR) && mkdir -p $(OUTPUT_DIR)
 	$(PODMAN) run --rm --privileged \
 		--security-opt=label=type:unconfined_t \
 		-v $(PWD)/$(OUTPUT_DIR):/output \
 		-v /var/lib/containers/storage:/var/lib/containers/storage \
 		quay.io/centos-bootc/bootc-image-builder:latest \
-		--type qcow2 localhost/$(VM_IMAGE_NAME):latest
+		--type qcow2 localhost/$(OMNI_IMAGE_NAME):latest
 	ls -lh $(OUTPUT_DIR)/qcow2/disk.qcow2
 
 .PHONY: seed
@@ -186,3 +184,64 @@ deploy: seed
 undeploy:
 	-sudo virsh destroy  $(HOSTNAME) 2>/dev/null
 	-sudo virsh undefine $(HOSTNAME) --remove-all-storage
+
+# =========================================================================
+#  Workstation variant (GNOME + Firefox + VS Code + Python 3.12)
+# =========================================================================
+
+WORKSTATION_IMAGE_NAME ?= $(IMAGE_NAME)-workstation
+
+.PHONY: workstation
+workstation:
+	$(PODMAN) build \
+		--build-arg BASE_IMAGE=localhost/$(IMAGE_NAME):latest \
+		-f $(ROCKY_VERSION)/workstation/Containerfile \
+		-t $(WORKSTATION_IMAGE_NAME) .
+
+.PHONY: workstation-qcow2
+workstation-qcow2: workstation
+	sudo rm -rf $(OUTPUT_DIR) && mkdir -p $(OUTPUT_DIR)
+	$(PODMAN) run --rm --privileged \
+		--security-opt=label=type:unconfined_t \
+		-v $(PWD)/$(OUTPUT_DIR):/output \
+		-v /var/lib/containers/storage:/var/lib/containers/storage \
+		quay.io/centos-bootc/bootc-image-builder:latest \
+		--type qcow2 localhost/$(WORKSTATION_IMAGE_NAME):latest
+	ls -lh $(OUTPUT_DIR)/qcow2/disk.qcow2
+
+# =========================================================================
+#  Housekeeping
+# =========================================================================
+.PHONY: clean
+clean:
+	rm -rf $(OUTPUT_DIR)
+
+.PHONY: help
+help:
+	@echo "Rocky Linux BootC Build System"
+	@echo ""
+	@echo "Base images (Rocky 9 or 10):"
+	@echo "  make base ROCKY_VERSION=10          Build Rocky 10 base bootc image"
+	@echo "  make base ROCKY_VERSION=9           Build Rocky 9 base bootc image"
+	@echo "  make rechunk                        Rechunk the base image"
+	@echo ""
+	@echo "Omni variant (Sidero Labs Omni + Dex + Zot):"
+	@echo "  make omni                           Build the Omni layered image"
+	@echo "  make qcow2                          Build Omni qcow2 disk image"
+	@echo "  make seed HOSTNAME=lab1             Generate cloud-init seed ISO"
+	@echo "  make deploy HOSTNAME=lab1           Deploy VM with virt-install"
+	@echo "  make undeploy HOSTNAME=lab1         Destroy and undefine VM"
+	@echo ""
+	@echo "Workstation variant (GNOME + Firefox + VS Code + Python 3.12):"
+	@echo "  make workstation                    Build the workstation layered image"
+	@echo "  make workstation-qcow2              Build workstation qcow2 disk image"
+	@echo ""
+	@echo "Zarf / Zot (Omni airgap supply chain):"
+	@echo "  make zarf-keygen                    Generate cosign keypair"
+	@echo "  make zarf-packages                  Build all Zarf packages"
+	@echo "  make zot-refresh                    Check for Zot image updates"
+	@echo ""
+	@echo "Variables:"
+	@echo "  ROCKY_VERSION=9|10  (default: 10)   Rocky Linux major version"
+	@echo "  PLATFORM=linux/amd64 (default)      Target platform"
+	@echo "  IMAGE_NAME=rocky-bootc (default)    Base image name"

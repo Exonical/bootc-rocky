@@ -1,0 +1,85 @@
+# Minimal GNOME workstation layered on a Rocky Linux 9 bootc base image.
+#
+# Build with:
+#   make base ROCKY_VERSION=9
+#   make workstation ROCKY_VERSION=9
+#
+# Or manually:
+#   sudo podman build -f 9/workstation/Containerfile \
+#     --build-arg BASE_IMAGE=localhost/rocky-bootc:latest \
+#     -t rocky-bootc-workstation .
+ARG BASE_IMAGE=localhost/rocky-bootc:latest
+FROM ${BASE_IMAGE}
+
+# ---- GNOME desktop (minimal) + core utilities ---------------------------
+RUN dnf install -y --setopt=install_weak_deps=False \
+    @gnome-desktop \
+    gdm \
+    gnome-terminal \
+    nautilus \
+    gnome-tweaks \
+    gnome-shell-extension-classification-banner \
+    gnome-shell-extension-heads-up-display \
+    xdg-utils \
+ && dnf clean all \
+ && rm -rf /var/cache/* /var/log/* /var/lib/dnf /var/tmp/*
+
+# ---- Firefox -------------------------------------------------------------
+RUN dnf install -y --setopt=install_weak_deps=False \
+    firefox \
+ && dnf clean all \
+ && rm -rf /var/cache/* /var/log/* /var/lib/dnf /var/tmp/*
+
+# ---- Visual Studio Code --------------------------------------------------
+RUN rpm --import https://packages.microsoft.com/keys/microsoft.asc \
+ && printf '[code]\nname=Visual Studio Code\nbaseurl=https://packages.microsoft.com/yumrepos/vscode\nenabled=1\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc\n' \
+    > /etc/yum.repos.d/vscode.repo \
+ && dnf install -y --setopt=install_weak_deps=False code \
+ && dnf clean all \
+ && rm -rf /var/cache/* /var/log/* /var/lib/dnf /var/tmp/*
+
+# ---- Python 3.12 ---------------------------------------------------------
+RUN dnf install -y --setopt=install_weak_deps=False \
+    python3.12 \
+    python3.12-pip \
+ && dnf clean all \
+ && rm -rf /var/cache/* /var/log/* /var/lib/dnf /var/tmp/*
+
+# ---- Enable graphical target + GDM --------------------------------------
+RUN systemctl set-default graphical.target \
+ && systemctl enable gdm.service
+
+# ---- bootc lint fixups: sysusers.d + tmpfiles.d for GNOME packages ------
+# Scan for all users/groups lacking sysusers.d coverage and generate entries.
+RUN covered=$(cat /usr/lib/sysusers.d/*.conf 2>/dev/null | awk '/^[ug] /{print $2}' | sort -u); \
+    > /usr/lib/sysusers.d/50-workstation.conf; \
+    while IFS=: read -r name _ uid gid gecos home shell; do \
+      echo "$covered" | grep -qx "$name" && continue; \
+      [ "$uid" -lt 1000 ] || [ "$name" = "nobody" ] && \
+        printf 'u %s %s "%s" %s %s\n' "$name" "$uid" "$gecos" "${home:-/}" "${shell:--}" \
+          >> /usr/lib/sysusers.d/50-workstation.conf; \
+    done < /etc/passwd; \
+    while IFS=: read -r name _ gid _; do \
+      echo "$covered" | grep -qx "$name" && continue; \
+      [ "$gid" -lt 1000 ] && \
+        printf 'g %s %s\n' "$name" "$gid" \
+          >> /usr/lib/sysusers.d/50-workstation.conf; \
+    done < /etc/group; \
+    true
+
+# Declare /var directories created by GNOME packages so bootc lint passes.
+RUN find /var/lib -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sort | while read -r d; do \
+      owner=$(stat -c '%U' "$d"); group=$(stat -c '%G' "$d"); mode=$(stat -c '%a' "$d"); \
+      printf 'd %s 0%s %s %s - -\n' "$d" "$mode" "$owner" "$group"; \
+    done > /usr/lib/tmpfiles.d/50-workstation-var.conf \
+ && find /var -mindepth 1 -not -type d -delete 2>/dev/null || true \
+ && find /var -mindepth 1 -type d -empty -delete 2>/dev/null || true
+
+# Scrub /var (bootc convention: /var must be empty in the image).
+RUN rm -rf /var/cache/* /var/log/* /var/lib/dnf /var/tmp/* \
+ && find /var -mindepth 1 -not -type d -delete 2>/dev/null || true \
+ && find /var -mindepth 1 -type d -empty -delete 2>/dev/null || true
+
+RUN bootc container lint --fatal-warnings
+STOPSIGNAL SIGRTMIN+3
+CMD ["/sbin/init"]
