@@ -16,7 +16,10 @@ RUN dnf install -y --setopt=install_weak_deps=False \
     @gnome-desktop \
     gdm \
     gnome-terminal \
+    nautilus \
     gnome-tweaks \
+    gnome-shell-extension-classification-banner \
+    gnome-shell-extension-heads-up-display \
     xdg-utils \
  && dnf clean all \
  && rm -rf /var/cache/* /var/log/* /var/lib/dnf /var/tmp/*
