@@ -1,0 +1,57 @@
+# Minimal GNOME workstation layered on a Rocky Linux bootc base image.
+#
+# Build with:
+#   make base ROCKY_VERSION=10
+#   make workstation ROCKY_VERSION=10
+#
+# Or manually:
+#   sudo podman build -f 10/workstation/Containerfile \
+#     --build-arg BASE_IMAGE=localhost/rocky-bootc:latest \
+#     -t rocky-bootc-workstation .
+ARG BASE_IMAGE=localhost/rocky-bootc:latest
+FROM ${BASE_IMAGE}
+
+# ---- GNOME desktop (minimal) + core utilities ---------------------------
+RUN dnf install -y --setopt=install_weak_deps=False \
+    @gnome-desktop \
+    gdm \
+    gnome-terminal \
+    nautilus \
+    gnome-tweaks \
+    gnome-shell-extension-classification-banner \
+    gnome-shell-extension-heads-up-display \
+    xdg-utils \
+ && dnf clean all \
+ && rm -rf /var/cache/* /var/log/* /var/lib/dnf /var/tmp/*
+
+# ---- Firefox -------------------------------------------------------------
+RUN dnf install -y --setopt=install_weak_deps=False \
+    firefox \
+ && dnf clean all \
+ && rm -rf /var/cache/* /var/log/* /var/lib/dnf /var/tmp/*
+
+# ---- Visual Studio Code --------------------------------------------------
+RUN rpm --import https://packages.microsoft.com/keys/microsoft.asc \
+ && printf '[code]\nname=Visual Studio Code\nbaseurl=https://packages.microsoft.com/yumrepos/vscode\nenabled=1\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc\n' \
+    > /etc/yum.repos.d/vscode.repo \
+ && dnf install -y --setopt=install_weak_deps=False code \
+ && dnf clean all \
+ && rm -rf /var/cache/* /var/log/* /var/lib/dnf /var/tmp/*
+
+# ---- Python 3.12 ---------------------------------------------------------
+RUN dnf install -y --setopt=install_weak_deps=False \
+    python3.12 \
+    python3.12-pip \
+ && dnf clean all \
+ && rm -rf /var/cache/* /var/log/* /var/lib/dnf /var/tmp/*
+
+# ---- Enable graphical target + GDM --------------------------------------
+RUN systemctl set-default graphical.target \
+ && systemctl enable gdm.service
+
+# Scrub /var (bootc convention: /var must be empty in the image).
+RUN rm -rf /var/cache/* /var/log/* /var/lib/dnf /var/tmp/*
+
+RUN bootc container lint --fatal-warnings
+STOPSIGNAL SIGRTMIN+3
+CMD ["/sbin/init"]

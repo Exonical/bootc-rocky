@@ -1,0 +1,74 @@
+name: Build Workstation Images
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '9/workstation/**'
+      - '10/workstation/**'
+      - '.github/workflows/build-workstation.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - '9/workstation/**'
+      - '10/workstation/**'
+      - '.github/workflows/build-workstation.yml'
+  workflow_dispatch:
+    inputs:
+      rocky_version:
+        description: 'Rocky Linux version to build (9, 10, or all)'
+        required: false
+        default: 'all'
+
+env:
+  IMAGE_NAME: rocky-bootc
+  WORKSTATION_IMAGE_NAME: rocky-bootc-workstation
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        rocky_version: [9, 10]
+    steps:
+      - name: Filter by input (workflow_dispatch)
+        if: >-
+          github.event_name == 'workflow_dispatch' &&
+          github.event.inputs.rocky_version != 'all' &&
+          github.event.inputs.rocky_version != matrix.rocky_version
+        run: |
+          echo "Skipping Rocky ${{ matrix.rocky_version }} (requested ${{ github.event.inputs.rocky_version }})"
+          exit 0
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install podman
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq podman fuse-overlayfs
+
+      - name: Build base image (Rocky ${{ matrix.rocky_version }})
+        run: |
+          sudo podman build \
+            --platform=linux/amd64 \
+            --security-opt=label=disable \
+            --cap-add=all \
+            --device /dev/fuse \
+            -t ${{ env.IMAGE_NAME }}:latest \
+            -f ${{ matrix.rocky_version }}/Containerfile \
+            .
+
+      - name: Build workstation image (Rocky ${{ matrix.rocky_version }})
+        run: |
+          sudo podman build \
+            --build-arg BASE_IMAGE=localhost/${{ env.IMAGE_NAME }}:latest \
+            -t ${{ env.WORKSTATION_IMAGE_NAME }}:${{ matrix.rocky_version }} \
+            -f ${{ matrix.rocky_version }}/workstation/Containerfile \
+            .
+
+      - name: Verify image
+        run: |
+          sudo podman inspect ${{ env.WORKSTATION_IMAGE_NAME }}:${{ matrix.rocky_version }} \
+            --format '{{.Id}} {{.Size}}'

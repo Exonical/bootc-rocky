@@ -15,7 +15,7 @@
 set -euo pipefail
 
 REPO_ROOT="${REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
-ZARF_DIR="${ZARF_DIR:-$REPO_ROOT/omni/zarf}"
+ZARF_DIR="${ZARF_DIR:-$REPO_ROOT/10/omni/zarf}"
 OUTPUT_DIR="${OUTPUT_DIR:-$REPO_ROOT/output/zarf}"
 COSIGN_KEY="${COSIGN_KEY:-$ZARF_DIR/cosign.key}"
 COSIGN_PUB="${COSIGN_PUB:-$ZARF_DIR/cosign.pub}"

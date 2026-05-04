@@ -66,7 +66,7 @@ DNS           ?= 1.1.1.1
 
 # ---- Zarf packages -------------------------------------------------------
 ZARF                ?= zarf
-ZARF_DIR            = omni/zarf
+ZARF_DIR            = 10/omni/zarf
 ZARF_OUTPUT_DIR     = output/zarf
 COSIGN_KEY          ?= $(ZARF_DIR)/cosign.key
 COSIGN_PUB          ?= $(ZARF_DIR)/cosign.pub
@@ -99,7 +99,7 @@ ZOT_IMAGE ?= ghcr.io/project-zot/zot-minimal-linux-amd64:v2.1.16
 zot-refresh:
 	@command -v skopeo >/dev/null || { echo "install skopeo"; exit 2; }
 	@command -v sha256sum >/dev/null || { echo "install coreutils"; exit 2; }
-	@current=$$(awk '/^ARG ZOT_DIGEST=/{sub(/^ARG ZOT_DIGEST=/,""); print}' omni/Containerfile); \
+	@current=$$(awk '/^ARG ZOT_DIGEST=/{sub(/^ARG ZOT_DIGEST=/,""); print}' 10/omni/Containerfile); \
 	 upstream="sha256:$$(skopeo inspect --raw docker://$(ZOT_IMAGE) | sha256sum | awk '{print $$1}')"; \
 	 echo "image:    $(ZOT_IMAGE)"; \
 	 echo "current:  $$current"; \
@@ -108,7 +108,7 @@ zot-refresh:
 	   echo "up to date"; \
 	 else \
 	   echo; \
-	   echo "to update, edit omni/Containerfile:"; \
+	   echo "to update, edit 10/omni/Containerfile:"; \
 	   echo "  ARG ZOT_DIGEST=$$upstream"; \
 	 fi
 
@@ -128,7 +128,7 @@ zarf-packages-check:
 omni: zarf-packages-check
 	$(PODMAN) build \
 		--build-arg BASE_IMAGE=localhost/$(IMAGE_NAME):latest \
-		-f omni/Containerfile \
+		-f 10/omni/Containerfile \
 		-t $(OMNI_IMAGE_NAME) .
 
 # Legacy alias
@@ -195,7 +195,7 @@ WORKSTATION_IMAGE_NAME ?= $(IMAGE_NAME)-workstation
 workstation:
 	$(PODMAN) build \
 		--build-arg BASE_IMAGE=localhost/$(IMAGE_NAME):latest \
-		-f workstation/Containerfile \
+		-f $(ROCKY_VERSION)/workstation/Containerfile \
 		-t $(WORKSTATION_IMAGE_NAME) .
 
 .PHONY: workstation-qcow2

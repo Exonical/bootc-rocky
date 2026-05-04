@@ -5,7 +5,7 @@
 #   make omni ROCKY_VERSION=10
 #
 # Or manually:
-#   sudo podman build -f omni/Containerfile \
+#   sudo podman build -f 10/omni/Containerfile \
 #     --build-arg BASE_IMAGE=localhost/rocky-bootc:latest \
 #     -t rocky-bootc-omni .
 ARG BASE_IMAGE=localhost/rocky-bootc:latest
@@ -32,7 +32,7 @@ RUN dnf install -y --setopt=install_weak_deps=False httpd-tools cloud-init \
 # firewall-offline-cmd edits /etc/firewalld/zones/public.xml without needing
 # the daemon to be running, so the VM boots into a locked-down state with
 # exactly the ports Omni needs open (+ ssh, dhcpv6-client from defaults).
-COPY omni/firewalld/omni.xml /usr/lib/firewalld/services/omni.xml
+COPY 10/omni/firewalld/omni.xml /usr/lib/firewalld/services/omni.xml
 RUN dnf install -y --setopt=install_weak_deps=False firewalld \
  && firewall-offline-cmd --zone=public --add-service=omni \
  && systemctl enable firewalld.service \
@@ -45,7 +45,7 @@ RUN dnf install -y --setopt=install_weak_deps=False firewalld \
 # build time into a local OCI layout, and at first boot load it into
 # podman containers-storage so zot.service can start offline. Everything
 # else (Omni, Dex, Talos, Cilium, ...) is delivered as cosign-signed
-# Zarf packages; see omni/zarf/README.md.
+# Zarf packages; see 10/omni/zarf/README.md.
 #
 # To bump Zot: run `make zot-refresh` (prints current upstream digest for
 # the ZOT_IMAGE tag), review the diff, commit the new ZOT_DIGEST.
@@ -69,16 +69,16 @@ RUN dnf install -y --setopt=install_weak_deps=False jq skopeo \
  && rm -rf /var/lib/containers /var/cache/* /var/log/* /var/tmp/*
 
 # Deterministic inventory + tree hash of /usr/share/zot-preload.
-COPY omni/scripts/airgap-inventory.sh    /usr/libexec/airgap-inventory
+COPY 10/omni/scripts/airgap-inventory.sh    /usr/libexec/airgap-inventory
 RUN chmod 0755 /usr/libexec/airgap-inventory \
  && /usr/libexec/airgap-inventory
 
 # Zot configuration + first-boot loader for the preloaded layout.
-COPY omni/zot/config.json /etc/zot/config.json
-COPY omni/containers/registries.conf.d/zot.conf \
+COPY 10/omni/zot/config.json /etc/zot/config.json
+COPY 10/omni/containers/registries.conf.d/zot.conf \
      /etc/containers/registries.conf.d/zot.conf
-COPY omni/scripts/airgap-image-load.sh       /usr/libexec/airgap-image-load
-COPY omni/scripts/airgap-image-load.service  /usr/lib/systemd/system/airgap-image-load.service
+COPY 10/omni/scripts/airgap-image-load.sh       /usr/libexec/airgap-image-load
+COPY 10/omni/scripts/airgap-image-load.service  /usr/lib/systemd/system/airgap-image-load.service
 RUN chmod 0755 /usr/libexec/airgap-image-load \
  && systemctl enable airgap-image-load.service
 
@@ -93,18 +93,18 @@ RUN curl -fsSL -o /usr/local/bin/zarf \
  && chmod 0755 /usr/local/bin/zarf \
  && /usr/local/bin/zarf version
 COPY output/zarf/zarf-package-*.tar.zst    /usr/share/zarf/packages/
-COPY omni/zarf/cosign.pub                  /etc/zarf/cosign.pub
-COPY omni/scripts/zarf-package-publish.sh      /usr/libexec/zarf-package-publish
-COPY omni/scripts/zarf-package-publish.service /usr/lib/systemd/system/zarf-package-publish.service
+COPY 10/omni/zarf/cosign.pub                  /etc/zarf/cosign.pub
+COPY 10/omni/scripts/zarf-package-publish.sh      /usr/libexec/zarf-package-publish
+COPY 10/omni/scripts/zarf-package-publish.service /usr/lib/systemd/system/zarf-package-publish.service
 RUN chmod 0755 /usr/libexec/zarf-package-publish \
  && systemctl enable zarf-package-publish.service
 
 # --- Quadlets: Omni, Dex, Zot systemd container units --------------------
-COPY omni/quadlets/*.container /usr/share/containers/systemd/
+COPY 10/omni/quadlets/*.container /usr/share/containers/systemd/
 
 # --- First-boot bootstrap: PKI, configs, etcd key -----------------------
-COPY omni/scripts/omni-bootstrap.sh      /usr/libexec/omni-bootstrap
-COPY omni/scripts/omni-bootstrap.service /usr/lib/systemd/system/omni-bootstrap.service
+COPY 10/omni/scripts/omni-bootstrap.sh      /usr/libexec/omni-bootstrap
+COPY 10/omni/scripts/omni-bootstrap.service /usr/lib/systemd/system/omni-bootstrap.service
 RUN chmod 0755 /usr/libexec/omni-bootstrap \
  && systemctl enable omni-bootstrap.service \
  && systemctl enable podman.socket

@@ -8,28 +8,30 @@ Three image variants are provided:
 | Variant | Description | Containerfile |
 |---|---|---|
 | **base** | Minimal bootc OS (Rocky 9 or 10) | `9/Containerfile`, `10/Containerfile` |
-| **omni** | Base + [Sidero Labs Omni](https://docs.siderolabs.com/omni/) v1.7.1, Dex OIDC, Zot registry | `omni/Containerfile` |
-| **workstation** | Base + GNOME desktop, Firefox, VS Code, Python 3.12 | `workstation/Containerfile` |
+| **omni** | Base + [Sidero Labs Omni](https://docs.siderolabs.com/omni/) v1.7.1, Dex OIDC, Zot registry (Rocky 10) | `10/omni/Containerfile` |
+| **workstation** | Base + GNOME desktop, Firefox, VS Code, Python 3.12 | `9/workstation/Containerfile`, `10/workstation/Containerfile` |
 
 ## Repository layout
 
 ```
 ├── 9/
 │   ├── Containerfile             # Rocky Linux 9 base bootc image
-│   └── rockylinux-9.yaml         # bootc-base-imagectl manifest
+│   ├── rockylinux-9.yaml         # bootc-base-imagectl manifest
+│   └── workstation/
+│       └── Containerfile         # GNOME workstation on Rocky 9
 ├── 10/
 │   ├── Containerfile             # Rocky Linux 10 base bootc image
-│   └── rockylinux-10.yaml        # bootc-base-imagectl manifest
-├── omni/
-│   ├── Containerfile             # Omni stack layered on base
-│   ├── quadlets/                 # Systemd Quadlet units (omni, dex, zot)
-│   ├── scripts/                  # Bootstrap + airgap + zarf-publish
-│   ├── firewalld/                # Omni firewalld service definition
-│   ├── zot/                      # Zot registry configuration
-│   ├── zarf/                     # Zarf package definitions + cosign pubkey
-│   └── containers/               # Podman registries.conf.d
-├── workstation/
-│   └── Containerfile             # GNOME workstation layered on base
+│   ├── rockylinux-10.yaml        # bootc-base-imagectl manifest
+│   ├── omni/                     # Omni stack (Rocky 10 only)
+│   │   ├── Containerfile
+│   │   ├── quadlets/             # Systemd Quadlet units (omni, dex, zot)
+│   │   ├── scripts/              # Bootstrap + airgap + zarf-publish
+│   │   ├── firewalld/            # Omni firewalld service definition
+│   │   ├── zot/                  # Zot registry configuration
+│   │   ├── zarf/                 # Zarf package definitions + cosign pubkey
+│   │   └── containers/           # Podman registries.conf.d
+│   └── workstation/
+│       └── Containerfile         # GNOME workstation on Rocky 10
 ├── scripts/
 │   ├── zarf-build-packages.sh    # Build Zarf packages from definitions
 │   └── make-seed.sh              # Generate cloud-init seed ISO
@@ -56,18 +58,18 @@ make base ROCKY_VERSION=10
 make base ROCKY_VERSION=9
 ```
 
-### Omni variant (Sidero Labs Omni + Dex + Zot)
+### Omni variant (Sidero Labs Omni + Dex + Zot — Rocky 10 only)
 
 ```bash
-# 1. Build the base image first
+# 1. Build the Rocky 10 base image
 make base ROCKY_VERSION=10
 
-# 2. Build Zarf packages (requires cosign keypair; see omni/zarf/README.md)
+# 2. Build Zarf packages (requires cosign keypair; see 10/omni/zarf/README.md)
 make zarf-keygen          # one-time
 make zarf-packages
 
 # 3. Build the Omni layered image
-make omni ROCKY_VERSION=10
+make omni
 
 # 4. (Optional) Build qcow2 and deploy to libvirt
 make qcow2
@@ -75,24 +77,27 @@ make seed HOSTNAME=lab1 DOMAIN=example.com
 make deploy HOSTNAME=lab1
 ```
 
-See `docs/omni-bootc.md` and `omni/quadlets/README.md` for the full
+See `docs/omni-bootc.md` and `10/omni/quadlets/README.md` for the full
 operator reference.
 
 ### Workstation variant (GNOME desktop)
 
 ```bash
-# 1. Build the base image first
+# Rocky 10 workstation
 make base ROCKY_VERSION=10
-
-# 2. Build the workstation layered image
 make workstation ROCKY_VERSION=10
 
-# 3. (Optional) Build qcow2
+# Rocky 9 workstation
+make base ROCKY_VERSION=9
+make workstation ROCKY_VERSION=9
+
+# (Optional) Build qcow2
 make workstation-qcow2
 ```
 
 The workstation image includes:
-- GNOME desktop (minimal)
+- GNOME desktop (minimal) with terminal, file manager (Nautilus), tweaks
+- GNOME Shell extensions: classification-banner, heads-up-display
 - Firefox
 - Visual Studio Code
 - Python 3.12

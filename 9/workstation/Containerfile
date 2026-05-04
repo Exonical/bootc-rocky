@@ -1,11 +1,11 @@
-# Minimal GNOME workstation layered on a Rocky Linux bootc base image.
+# Minimal GNOME workstation layered on a Rocky Linux 9 bootc base image.
 #
 # Build with:
-#   make base ROCKY_VERSION=10
-#   make workstation ROCKY_VERSION=10
+#   make base ROCKY_VERSION=9
+#   make workstation ROCKY_VERSION=9
 #
 # Or manually:
-#   sudo podman build -f workstation/Containerfile \
+#   sudo podman build -f 9/workstation/Containerfile \
 #     --build-arg BASE_IMAGE=localhost/rocky-bootc:latest \
 #     -t rocky-bootc-workstation .
 ARG BASE_IMAGE=localhost/rocky-bootc:latest

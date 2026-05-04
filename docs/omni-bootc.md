@@ -5,7 +5,7 @@ top of the Rocky Linux 10 bootc base image in this repository. It covers the
 full lifecycle: build, deploy, authenticate, operate, and recover.
 
 - **Base image**: Rocky Linux 9 or 10 bootc (built from `@9/Containerfile` or `@10/Containerfile`)
-- **Layered image**: base + Quadlets + bootstrap (built from `@omni/Containerfile`)
+- **Layered image**: base + Quadlets + bootstrap (built from `10/omni/Containerfile`)
 - **Runtime**: systemd-managed Podman Quadlets for Omni and Dex, fronted by a
   first-boot bootstrap service that establishes a local PKI
 - **Provisioning**: per-VM via NoCloud cloud-init seed ISO (no credentials in
@@ -51,30 +51,32 @@ full lifecycle: build, deploy, authenticate, operate, and recover.
 ```
 ├── 9/
 │   ├── Containerfile             # Rocky Linux 9 base bootc image
-│   └── rockylinux-9.yaml         # bootc-base-imagectl manifest
+│   ├── rockylinux-9.yaml         # bootc-base-imagectl manifest
+│   └── workstation/
+│       └── Containerfile         # GNOME workstation on Rocky 9
 ├── 10/
 │   ├── Containerfile             # Rocky Linux 10 base bootc image
-│   └── rockylinux-10.yaml        # bootc-base-imagectl manifest
-├── omni/
-│   ├── Containerfile             # Omni stack layered on base
-│   ├── quadlets/
-│   │   ├── omni.container        # Quadlet -> omni.service
-│   │   ├── dex.container         # Quadlet -> dex.service
-│   │   ├── zot.container         # Quadlet -> zot.service
-│   │   ├── omni-config.yaml.example
-│   │   └── README.md             # short operator first-boot reference
-│   ├── scripts/
-│   │   ├── omni-bootstrap.service
-│   │   ├── omni-bootstrap.sh     # idempotent PKI + config generator
-│   │   ├── airgap-image-load.*   # Zot preload into containers-storage
-│   │   ├── airgap-inventory.sh   # deterministic preload hash
-│   │   └── zarf-package-publish.*# first-boot Zarf mirror into Zot
-│   ├── firewalld/                # omni.xml service definition
-│   ├── zot/                      # Zot registry config
-│   ├── zarf/                     # Zarf package definitions + cosign.pub
-│   └── containers/               # registries.conf.d
-├── workstation/
-│   └── Containerfile             # GNOME workstation layered on base
+│   ├── rockylinux-10.yaml        # bootc-base-imagectl manifest
+│   ├── omni/
+│   │   ├── Containerfile         # Omni stack layered on Rocky 10 base
+│   │   ├── quadlets/
+│   │   │   ├── omni.container    # Quadlet -> omni.service
+│   │   │   ├── dex.container     # Quadlet -> dex.service
+│   │   │   ├── zot.container     # Quadlet -> zot.service
+│   │   │   ├── omni-config.yaml.example
+│   │   │   └── README.md         # short operator first-boot reference
+│   │   ├── scripts/
+│   │   │   ├── omni-bootstrap.service
+│   │   │   ├── omni-bootstrap.sh # idempotent PKI + config generator
+│   │   │   ├── airgap-image-load.*  # Zot preload into containers-storage
+│   │   │   ├── airgap-inventory.sh  # deterministic preload hash
+│   │   │   └── zarf-package-publish.*  # first-boot Zarf mirror into Zot
+│   │   ├── firewalld/            # omni.xml service definition
+│   │   ├── zot/                  # Zot registry config
+│   │   ├── zarf/                 # Zarf package definitions + cosign.pub
+│   │   └── containers/           # registries.conf.d
+│   └── workstation/
+│       └── Containerfile         # GNOME workstation on Rocky 10
 ├── docs/
 │   └── omni-bootc.md             # this file
 ├── output/                       # build artifacts (gitignored)
@@ -111,7 +113,7 @@ make omni ROCKY_VERSION=10
 Or manually:
 
 ```bash
-sudo podman build -f omni/Containerfile \
+sudo podman build -f 10/omni/Containerfile \
   --build-arg BASE_IMAGE=localhost/rocky-bootc:latest \
   -t rocky-bootc-omni .
 ```
@@ -124,7 +126,7 @@ What the layered Containerfile does:
 | remove dhcpcd if present | Rocky 10 cloud-init hard-requires dhcpcd; NM handles networking |
 | `ln -sf ../cloud-init.target default.target.wants/` | enable cloud-init the RHEL/CentOS bootc way |
 | `rm -rf /var/{cache,log,lib/{dnf,cloud,dhcpcd},tmp}/*` | satisfy bootc lint (`/var` must be empty in image) |
-| `COPY omni/quadlets/*.container /usr/share/containers/systemd/` | install vendor-managed quadlets |
+| `COPY 10/omni/quadlets/*.container /usr/share/containers/systemd/` | install vendor-managed quadlets |
 | `COPY omni-bootstrap.sh -> /usr/libexec/omni-bootstrap` | first-boot PKI script |
 | `COPY omni-bootstrap.service -> /usr/lib/systemd/system/` + `systemctl enable` | wire the bootstrap into boot |
 | `systemctl enable podman.socket` | expose rootful podman API |
