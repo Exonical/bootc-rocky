@@ -32,19 +32,19 @@ those stay in `images.txt` + `images.lock` with our custom L1 pipeline.
 
 ```bash
 # One-time: generate a cosign keypair for signing packages.
-make zarf-keygen                       # writes 10/zarf/cosign.{key,pub}
+make zarf-keygen                       # writes omni/zarf/cosign.{key,pub}
                                        # cosign.pub is committed; cosign.key is NOT
 
-# Build all packages from the definitions in 10/zarf/*/zarf.yaml.
+# Build all packages from the definitions in omni/zarf/*/zarf.yaml.
 # Output: output/zarf/zarf-package-<name>-amd64-<version>.tar.zst
 make zarf-packages
 
 # Inspect a package's contents (verifies signature + lists images + SBOMs).
 zarf package inspect output/zarf/zarf-package-cilium-amd64-1.19.3.tar.zst \
-  --key 10/zarf/cosign.pub
+  --key omni/zarf/cosign.pub
 ```
 
-`make image-vm` depends on `zarf-packages`; the `.tar.zst` files are baked
+`make omni` depends on `zarf-packages`; the `.tar.zst` files are baked
 into the image at `/usr/share/zarf/packages/`, alongside `cosign.pub` at
 `/etc/zarf/cosign.pub`.
 
@@ -64,8 +64,8 @@ each `.tar.zst` in `/usr/share/zarf/packages/`:
 ## Adding a new package
 
 ```bash
-mkdir -p 10/zarf/my-thing-1.2.3
-cat > 10/zarf/my-thing-1.2.3/zarf.yaml <<'EOF'
+mkdir -p omni/zarf/my-thing-1.2.3
+cat > omni/zarf/my-thing-1.2.3/zarf.yaml <<'EOF'
 kind: ZarfPackageConfig
 metadata:
   name: my-thing
@@ -79,5 +79,5 @@ components:
       - registry.example.com/my-thing:1.2.3
 EOF
 make zarf-packages   # regenerates output/zarf/*.tar.zst
-make image-vm        # rebakes the VM image
+make omni            # rebakes the Omni image
 ```

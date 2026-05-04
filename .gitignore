@@ -2,8 +2,8 @@
 /output/
 
 # Cosign signing private key for Zarf packages -- MUST NOT be committed.
-# (10/zarf/cosign.pub IS committed; only the .key is secret.)
-10/zarf/cosign.key
+# (omni/zarf/cosign.pub IS committed; only the .key is secret.)
+omni/zarf/cosign.key
 **/cosign.key
 **/cosign.password
 
@@ -14,4 +14,4 @@
 /omni-lab-ca.crt
 *.crt
 *.pem
-!10/firewalld/*.xml
+!omni/firewalld/*.xml
