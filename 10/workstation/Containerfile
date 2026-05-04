@@ -12,8 +12,7 @@ ARG BASE_IMAGE=localhost/rocky-bootc:latest
 FROM ${BASE_IMAGE}
 
 # ---- GNOME desktop (minimal) + core utilities ---------------------------
-# Rocky 10 (GNOME 47): gnome-terminal -> ptyxis, gnome-tweaks -> gnome-tweaks
-# is in EPEL/appstream; fall back gracefully if unavailable.
+# Rocky 10 (GNOME 47): gnome-terminal replaced by ptyxis.
 RUN dnf install -y --setopt=install_weak_deps=False \
     @gnome-desktop \
     gdm \
@@ -22,7 +21,7 @@ RUN dnf install -y --setopt=install_weak_deps=False \
     gnome-shell-extension-classification-banner \
     gnome-shell-extension-heads-up-display \
     xdg-utils \
- && dnf install -y --setopt=install_weak_deps=False gnome-tweaks || true \
+ && (dnf install -y --setopt=install_weak_deps=False gnome-tweaks || true) \
  && dnf clean all \
  && rm -rf /var/cache/* /var/log/* /var/lib/dnf /var/tmp/*
 
@@ -51,8 +50,34 @@ RUN dnf install -y --setopt=install_weak_deps=False \
 RUN systemctl set-default graphical.target \
  && systemctl enable gdm.service
 
+# ---- bootc lint fixups: sysusers.d + tmpfiles.d for GNOME packages ------
+# GNOME packages create users/groups and /var content that bootc lint requires
+# to be declared via systemd sysusers.d and tmpfiles.d.
+RUN for user in avahi wsdd; do \
+      if getent passwd "$user" >/dev/null 2>&1; then \
+        uid=$(getent passwd "$user" | cut -d: -f3); \
+        printf 'u %s %s\n' "$user" "$uid"; \
+      fi; \
+    done > /usr/lib/sysusers.d/50-workstation.conf \
+ && for grp in avahi wsdd; do \
+      if getent group "$grp" >/dev/null 2>&1; then \
+        gid=$(getent group "$grp" | cut -d: -f3); \
+        printf 'g %s %s\n' "$grp" "$gid"; \
+      fi; \
+    done >> /usr/lib/sysusers.d/50-workstation.conf || true
+
+# Declare /var directories created by GNOME packages so bootc lint passes.
+RUN find /var/lib -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sort | while read -r d; do \
+      owner=$(stat -c '%U' "$d"); group=$(stat -c '%G' "$d"); mode=$(stat -c '%a' "$d"); \
+      printf 'd %s 0%s %s %s - -\n' "$d" "$mode" "$owner" "$group"; \
+    done > /usr/lib/tmpfiles.d/50-workstation-var.conf \
+ && find /var -mindepth 1 -not -type d -delete 2>/dev/null || true \
+ && find /var -mindepth 1 -type d -empty -delete 2>/dev/null || true
+
 # Scrub /var (bootc convention: /var must be empty in the image).
-RUN rm -rf /var/cache/* /var/log/* /var/lib/dnf /var/tmp/*
+RUN rm -rf /var/cache/* /var/log/* /var/lib/dnf /var/tmp/* \
+ && find /var -mindepth 1 -not -type d -delete 2>/dev/null || true \
+ && find /var -mindepth 1 -type d -empty -delete 2>/dev/null || true
 
 RUN bootc container lint --fatal-warnings
 STOPSIGNAL SIGRTMIN+3
